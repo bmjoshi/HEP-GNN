@@ -4,6 +4,49 @@ from torch import cdist, index_select
 
 from .layers import GravNetLayers
 
+class GravNetLayer(nn.Module):
+
+    def __init__(self, input_dim: int,
+                       latent_output_dim: int,
+                       feature_output_dim: int,
+                       n_neighbors: int):
+
+        self.latent_output_dim  = latent_output_dim
+        self.feature_output_dim = feature_output_dim 
+
+        self.latent_network  = []
+        self.feature_network = [] 
+
+        self.latent_network += nn.Linear(in_features=input_dim, out_features=latent_output_dim)
+        self.latent_network += nn.Tanh()
+        self.latent_network  = nn.Sequential(self.latent_network)
+
+        self.feature_network += nn.Linear(in_features=input_dim, out_features=feature_output_dim)
+        self.feature_network += nn.Tanh()
+        self.feature_network  = nn.Sequential(self.feature_network)
+
+    def forward(self, x):
+
+        # get the learned features and sptial coordinates
+        learned_features = self.feature_network(x)
+        spatial_coords   = self.latent_network(x)
+
+        # generate edge index
+        edge_index = knn_graph(spatial_coords, self.n_neighbors)
+
+        # calculate the distance between neighbors
+        neighbors = index_select(spatial_coords, 0, edge_index[1])
+        distances = cdist(spatial, neighbors, metric='euclidian')
+        weights   = self.kernel(distances)
+
+        # used learned features for message passing between vertices
+        messages = [x]
+
+        
+
+
+        return self.gravnet_layer(x)
+
 
 class GravNetBlock(nn.Module):
 
