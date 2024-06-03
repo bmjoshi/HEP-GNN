@@ -41,9 +41,10 @@ class GravNetLayer(nn.Module):
 
         # used learned features for message passing between vertices
         messages = [x]
+        for messanger in self.messangers:
+            messages.append(messanger[learned,weights])
 
-        
-
+        all_features = torch.cat(messages, dim=1)
 
         return self.gravnet_layer(x)
 
