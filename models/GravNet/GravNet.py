@@ -1,8 +1,15 @@
-from torch.gnn_geometric.nn import MessagePassing
+from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import knn_graph
 from torch import cdist, index_select
 
+import numpy as np
+
 from .layers import GravNetLayers
+
+class GravNetMessagePassing(nn.MessagePassing):
+    def __init__(self, x, w):
+        super().__init__()
+        return np.multiply(x, w)
 
 class GravNetLayer(nn.Module):
 
@@ -25,6 +32,11 @@ class GravNetLayer(nn.Module):
         self.feature_network += nn.Tanh()
         self.feature_network  = nn.Sequential(self.feature_network)
 
+        self.messangers = 
+
+        for aggr in :
+
+
     def forward(self, x):
 
         # get the learned features and sptial coordinates
@@ -45,6 +57,9 @@ class GravNetLayer(nn.Module):
             messages.append(messanger[learned,weights])
 
         all_features = torch.cat(messages, dim=1)
+        for messanger in self.messangers:
+            messages += messanger(x)
+
 
         return self.gravnet_layer(x)
 
