@@ -4,13 +4,13 @@ class GravNetMap(dict):
     """
     def __init__(self):
 
-        self.__attr = ['input_dense', 'output_dense', 'n_aggr', 'n_latent_space', 'n_latent_features']
+        self.__attr = ['input_dense', 'output_dense', 'n_blocks', 'n_latent_space', 'n_latent_features']
         self.__dict = {}
 
         self.__dict['input_dense']       = (4, 2, 1)
         self.__dict['output_dense']      = (4, 2, 1)
-        self.__dict['n_aggr']            = 3
-        self.__dict['type_aggr']         = 'sum'
+        self.__dict['n_blocks']          = 3
+        self.__dict['type_aggr']         = ['sum']
         self.__dict['n_latent_space']    = 2
         self.__dict['n_latent_features'] = 3
 
@@ -27,7 +27,9 @@ class GravNetMap(dict):
             assert type(value) == int, 'Item assignment for %s requires integer values!' % key
 
         elif 'type_' in key:
-            assert type(value) == str
+            assert type(value) == list, 'A list of aggregation modes is expected!'
+            for item in value:
+                assert type(value) == str, 'Item assignment for %s requires integer values!' % key
 
         else:
             for item in value:

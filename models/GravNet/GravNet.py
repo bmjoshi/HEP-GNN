@@ -4,19 +4,44 @@ from torch import cdist, index_select
 
 import numpy as np
 
-from .layers import GravNetLayers
+from .kernels import *
+from .networkMap import GravNetMap
 
-class GravNetMessagePassing(nn.MessagePassing):
-    def __init__(self, x, w):
-        super().__init__()
-        return np.multiply(x, w)
+class GravNetMessagePassing(MessagePassing):
+    def __init__(self, aggr=['add'], input_dim=3, output_dim=3):
+        super().__init__(aggr=aggr)
+        
+        self.aggr         = aggr
+        self.input_dim    = input_dim
+        self.output_dim   = output_dim
+        self.output_dense = nn.Sequential()
+        
+		self.output_dense.append(nn.Linear(in_features=input_dim*(len(self.aggr)+1), out_features=self.output_dim))
+
+
+    def forward(self, x, edge_index, weights=w):
+        
+        # get the weights of the nodes by using gaussian kernel
+        
+        out = self.propagate(edge_index, x=x, weights=w)
+        out = torch.cat([x, out], dim=1)
+		out = self.output_dense(out)
+        
+		return out
+
+    def message(self, x_j, w):
+        print(w, x_j)
+        return w.view(-1,1)*x_j
+
 
 class GravNetLayer(nn.Module):
 
     def __init__(self, input_dim: int,
                        latent_output_dim: int,
                        feature_output_dim: int,
-                       n_neighbors: int):
+                       n_neighbors: int,
+					   kernel: str,
+					   aggr: list):
 
         self.latent_output_dim  = latent_output_dim
         self.feature_output_dim = feature_output_dim 
@@ -32,9 +57,13 @@ class GravNetLayer(nn.Module):
         self.feature_network += nn.Tanh()
         self.feature_network  = nn.Sequential(self.feature_network)
 
-        self.messangers = 
+        self.messangers = GravNetMessagePassing(aggr)
 
-        for aggr in :
+        # TODO: explore and add more kernels
+        if kernel not in kernel_list:
+            raise ValueError('Kernel %s not in the specified list!'%kernel)
+
+        self.kernel       = kernel_map[kernel]
 
 
     def forward(self, x):
@@ -45,23 +74,19 @@ class GravNetLayer(nn.Module):
 
         # generate edge index
         edge_index = knn_graph(spatial_coords, self.n_neighbors)
+		
+		self.messanger(aggr=self.aggr, input_dim=self.feature_output_dim, output_dim=self.latent_output_dim)
+
 
         # calculate the distance between neighbors
-        neighbors = index_select(spatial_coords, 0, edge_index[1])
-        distances = cdist(spatial, neighbors, metric='euclidian')
-        weights   = self.kernel(distances)
+        distances = cdist(spatial_coords, spatial_coords, p=2) # p=2 for euclidian distances
+        distances = distances[edge_index[0], edge_index[1]]
+		weights   = self.kernel(distances) 
 
         # used learned features for message passing between vertices
-        messages = [x]
-        for messanger in self.messangers:
-            messages.append(messanger[learned,weights])
+		out = self.messanger(features, edge_index, weights=weights)
 
-        all_features = torch.cat(messages, dim=1)
-        for messanger in self.messangers:
-            messages += messanger(x)
-
-
-        return self.gravnet_layer(x)
+        return out
 
 
 class GravNetBlock(nn.Module):
@@ -121,49 +146,19 @@ class GravNet(nn.Module):
         super(GravNet, self).__init__()
         """
         Input Parameters:
-            - layers (object): An object class containing dictionary with a following structure: { "input_dense": (), "n_aggr": int, "output_dense": ()}, where "input_dense" is a tuple indicating the numbers of nodes in each layer of the first dense network, the "output_dense" is a similary array for the output layer and  the "n_aggr" is the number of aggregation layers, "type_aggregation" is the aggregation method to be used in the graph, 
+            - layers (object): An object class containing dictionary with a following structure: { "input_dense": (), "n_blocks": int, "output_dense": ()}, where "input_dense" is a tuple indicating the numbers of nodes in each layer of the first dense network, the "output_dense" is a similary array for the output layer and  the "n_blocks" is the number of aggregation layers, "type_aggregation" is the aggregation method to be used in the graph, 
             - n_neighbors (int): Number of message passing neighbors for each data point.
             - kernel (str): kernel type, either "gaussian" or "exponential"
         """
         
         self.n_neighbors = n_neighbors
         self.layers      = layers
+        self.n_blocks    = n_blocks
+        self.network     = nn.Sequential()
 
-        if kernel not in _allowed_kernels:
-            self.kernel      = _allowed_kernels[kernel]
+        self.network.append(GravNetBlock)
 
-        else:
-            self.kernel      = None
-
-        GravNetBlock()
-    
-    def buildInputLayer(self):
-        """
-        Function to build the input network components in the GravNet model.
-        """
-
-        # Get layers from the input_dense (x,...,y) such that y = n_latent_space + n_latent_features
-
-        assert layers['input_layer'][-1] == (layers['n_latent_space'] + layers['n_latent_features']), "Dimension of the the input_dense should be compatible with the latent space!"
-
-        input_block = []
-        
-        for ilayer, n_nodes in enumerate(self.layers['input_dense']):i
-            n_next_nodes = self.layers['input_dense'][ilayer+1]
-            if ilayer==len(self.layers['input_dense'])-1:
-                input_block += nn.BatchNorm1d(n_nodes)
-            else:
-                input_block += nn.Linear(in_features=n_nodes, out_feature=n_next_nodes)
-                input_block += nn.Tanh()
-
-        input_block += 
-
-        return nn.Sequential(_input_block)
-
-    
-
-    def build
-
+        self.block = GravNetBlock()
 
 
 

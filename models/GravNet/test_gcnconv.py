@@ -1,16 +1,55 @@
 import torch
+
+from torch import nn
+from torch import cdist, index_select
 from torch.nn import Linear, Parameter
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
+from torch_geometric.typing import OptTensor
 
 from torch_geometric.data import Data
 
+kernel_list = ['gauss']
+kernel_map = {}
+
+def gaussianKernel(d_ij: OptTensor) -> OptTensor:
+    return torch.exp(-d_ij)
+
+kernel_map['gauss'] = gaussianKernel
+
 class GravNetMessagePassing(MessagePassing):
-    def _init_(self):
-        super().__init__(aggr='add')
+    def __init__(self, kernel='gauss', n_neighbors=4, aggr=['add'], input_dim=3, output_dim=3):
+        super().__init__(aggr=aggr)
+        
+        self.n_neighbors = n_neighbors
+        self.aggr        = aggr
+        self.input_dim   = input_dim
+        self.output_dim  = output_dim
+
+        # TODO: explore and add more kernels
+        if kernel not in kernel_list:
+            raise ValueError('Kernel %s not in the specified list!'%kernel)
+
+        self.kernel       = kernel_map[kernel]
+        self.output_dense = nn.Sequential()
+        self.output_dense.append(nn.Linear(in_features=input_dim*len(self.aggr), out_features=self.output_dim))
+
+
     def forward(self, x, edge_index):
-    def message(self, x, w):
-        return torch.multiply(x, w)
+        
+        # get the weights of the nodes by using gaussian kernel
+        
+        distances = cdist(x, x, p=2) # p=2 for euclidian distances
+        distances = distances[edge_index[0], edge_index[1]] 
+        weights   = self.kernel(distances)
+        out       = self.propagate(edge_index, x=x, w=weights)
+        print('out', out)
+        out       = self.output_dense(out)
+        return out
+
+    def message(self, x_j, w):
+        print(w, x_j)
+        return w.view(-1,1)*x_j
 
 class GCNConv(MessagePassing):
     def __init__(self, in_channels, out_channels):
@@ -19,6 +58,7 @@ class GCNConv(MessagePassing):
         self.lin = Linear(in_channels, out_channels, bias=False)
         self.bias = Parameter(torch.empty(self.aggr_channel_size))
         self.dense_out = Linear(self.aggr_channel_size, 3)
+# data = Data(x=x, edge_index=edge_index.t().contiguous())
         self.reset_parameters()
         print('Done Reset')
 
@@ -31,7 +71,6 @@ class GCNConv(MessagePassing):
         # edge_index has shape [2, E]
 
         # Step 1: Add self-loops to the adjacency matrix.
-        print(x)
         print(edge_index.shape)
         new_var = add_self_loops(edge_index, num_nodes=x.size(0))
         edge_index, _ = new_var
@@ -61,7 +100,8 @@ class GCNConv(MessagePassing):
 
     def message(self, x_j, norm):
         # x_j has shape [E, out_channels]
-        print('x_j.shape: ', x_j.shape)
+        print('x_j, ', x_j)
+        print('w', norm)
         # Step 4: Normalize node features.
         return norm.view(-1, 1) * x_j
 
@@ -70,8 +110,11 @@ edge_index = torch.tensor([[0, 1],
                            [1, 2],
                            [2, 1]], dtype=torch.long)
 #x = torch.tensor([-1,0,1], dtype=torch.float)
-x = torch.rand([3, 3])
 # data = Data(x=x, edge_index=edge_index.t().contiguous())
-conv = GCNConv(3, 16)
-res = conv(x, edge_index=edge_index.t().contiguous())
+
+x = torch.rand([3, 3])
+print(x)
+#conv = GCNConv(3, 16)
+conv = GravNetMessagePassing(aggr=['add','max','min','mean'])
+res  = conv(x, edge_index=edge_index.t().contiguous())
 print(res)
