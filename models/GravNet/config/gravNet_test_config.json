@@ -1,0 +1,16 @@
+{
+    "n_input_freatures": 4,
+    "n_hidden_layers": 3,
+    "n_hidden_nodes": 64,
+    "n_output_features": 2,
+    "n_blocks": 3,
+    "n_neighbors": 4,
+    "type_aggr": [
+        "sum",
+        "max"
+    ],
+    "n_latent_space": 2,
+    "n_latent_features": 3,
+    "n_final_dense": 128,
+    "n_final_output": 1
+}
